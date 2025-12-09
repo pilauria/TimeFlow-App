@@ -1,0 +1,28 @@
+# Node & dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Builds
+dist/
+dist-electron/
+dist-ssr/
+*.local
+
+# Electron/Vite artifacts
+*.asar
+.vite/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Testing/coverage
+coverage/
+*.lcov
