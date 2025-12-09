@@ -2,45 +2,94 @@ import { useState, useEffect } from 'react';
 import { Project, Session } from '../types';
 import { generateId } from '../utils';
 
+type PersistedPayload = {
+  projects?: Project[];
+  sessions?: Session[];
+  pomodoroDurations?: unknown;
+};
+
 const getSignedDuration = (session: Session) => {
   const direction = session.direction || 'add';
   const magnitude = Math.abs(session.duration);
   return direction === 'subtract' ? -magnitude : magnitude;
 };
 
+const normalizeProjects = (projects: Project[] | null | undefined): Project[] => {
+  if (!Array.isArray(projects)) return [];
+  return projects.map(p => ({
+    ...p,
+    startDate: p.startDate || Date.now(),
+  }));
+};
+
+const normalizeSessions = (sessions: Session[] | null | undefined): Session[] => {
+  if (!Array.isArray(sessions)) return [];
+  return sessions.map(s => ({
+    ...s,
+    source: s.source || 'timer',
+    direction: s.direction || 'add',
+    duration: Math.abs(s.duration),
+  }));
+};
+
+const loadLocalProjects = () => {
+  const saved = localStorage.getItem('projects');
+  const parsed: Project[] | null = saved ? JSON.parse(saved) : null;
+  return normalizeProjects(parsed);
+};
+
+const loadLocalSessions = () => {
+  const saved = localStorage.getItem('sessions');
+  const parsed: Session[] | null = saved ? JSON.parse(saved) : null;
+  return normalizeSessions(parsed);
+};
+
 export const useProjects = () => {
-  const [projects, setProjects] = useState<Project[]>(() => {
-    const saved = localStorage.getItem('projects');
-    const parsed: Project[] | null = saved ? JSON.parse(saved) : null;
-    // Ensure startDate exists for older data
-    return parsed
-      ? parsed.map(p => ({
-          ...p,
-          startDate: p.startDate || Date.now(),
-        }))
-      : [];
-  });
+  const [projects, setProjects] = useState<Project[]>(loadLocalProjects);
+  const [sessions, setSessions] = useState<Session[]>(loadLocalSessions);
 
-  const [sessions, setSessions] = useState<Session[]>(() => {
-    const saved = localStorage.getItem('sessions');
-    if (!saved) return [];
+  useEffect(() => {
+    let cancelled = false;
 
-    const parsed: Session[] = JSON.parse(saved);
-    // Normalize historical data to include direction/source so calculations stay consistent
-    return parsed.map(s => ({
-      ...s,
-      source: s.source || 'timer',
-      direction: s.direction || 'add',
-    }));
-  });
+    const loadPersisted = async () => {
+      try {
+        const data = await window.ipcRenderer?.invoke('storage:load') as PersistedPayload | null;
+        if (cancelled || !data) return;
+
+        if (data.projects) {
+          setProjects(normalizeProjects(data.projects));
+        }
+        if (data.sessions) {
+          setSessions(normalizeSessions(data.sessions));
+        }
+      } catch (error) {
+        console.error('Failed to load persisted data', error);
+      }
+    };
+
+    loadPersisted();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('projects', JSON.stringify(projects));
-  }, [projects]);
-
-  useEffect(() => {
     localStorage.setItem('sessions', JSON.stringify(sessions));
-  }, [sessions]);
+
+    const persistToDisk = async () => {
+      try {
+        await window.ipcRenderer?.invoke('storage:save', {
+          projects,
+          sessions,
+        });
+      } catch (error) {
+        console.error('Failed to persist data to disk', error);
+      }
+    };
+
+    persistToDisk();
+  }, [projects, sessions]);
 
   const addProject = (name: string, color: string) => {
     const newProject: Project = {

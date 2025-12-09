@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
+import fs from 'node:fs/promises'
 import path from 'node:path'
 
 process.env.DIST = path.join(__dirname, '../dist')
@@ -11,11 +12,61 @@ let win: BrowserWindow | null
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 
+type PersistedState = {
+  projects?: unknown[]
+  sessions?: unknown[]
+  pomodoroDurations?: unknown
+}
+
+const getStoragePath = () => path.join(app.getPath('userData'), 'timeflow-data.json')
+
+const loadPersistedState = async (): Promise<PersistedState | null> => {
+  try {
+    const storagePath = getStoragePath()
+    const contents = await fs.readFile(storagePath, 'utf-8')
+    return JSON.parse(contents)
+  } catch (error: any) {
+    if (error?.code !== 'ENOENT') {
+      console.warn('Failed to read persisted data', error)
+    }
+    return null
+  }
+}
+
+const savePersistedState = async (patch: PersistedState) => {
+  try {
+    const storagePath = getStoragePath()
+    const existing = (await loadPersistedState()) || {}
+    const next: PersistedState = {
+      projects: patch.projects ?? existing.projects ?? [],
+      sessions: patch.sessions ?? existing.sessions ?? [],
+      pomodoroDurations: patch.pomodoroDurations ?? existing.pomodoroDurations,
+    }
+
+    await fs.mkdir(path.dirname(storagePath), { recursive: true })
+    await fs.writeFile(storagePath, JSON.stringify(next), 'utf-8')
+    return true
+  } catch (error) {
+    console.error('Failed to persist data', error)
+    return false
+  }
+}
+
+ipcMain.handle('storage:load', async () => {
+  return loadPersistedState()
+})
+
+ipcMain.handle('storage:save', async (_event, patch: PersistedState) => {
+  return savePersistedState(patch)
+})
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1000,
     height: 800,
     icon: path.join(publicPath, 'electron-vite.svg'),
+    show: false,
+    backgroundColor: '#0f0f0f',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
@@ -25,6 +76,22 @@ function createWindow() {
         color: '#00000000',
         symbolColor: '#ffffff',
         height: 30
+    }
+  })
+
+  win.once('ready-to-show', () => {
+    win?.show()
+  })
+
+  win.webContents.once('dom-ready', () => {
+    if (!win?.isVisible()) {
+      win?.show()
+    }
+  })
+
+  win.webContents.on('did-fail-load', () => {
+    if (!win?.isVisible()) {
+      win?.show()
     }
   })
 

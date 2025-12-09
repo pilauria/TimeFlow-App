@@ -23,6 +23,16 @@ export const usePomodoro = () => {
 
   useEffect(() => {
     localStorage.setItem('pomodoroDurations', JSON.stringify(durations));
+
+    const persistToDisk = async () => {
+      try {
+        await window.ipcRenderer?.invoke('storage:save', { pomodoroDurations: durations });
+      } catch (error) {
+        console.error('Failed to persist Pomodoro settings', error);
+      }
+    };
+
+    persistToDisk();
   }, [durations]);
 
   // Removed Audio init, using direct function call
@@ -39,6 +49,27 @@ export const usePomodoro = () => {
     }
     return () => clearInterval(interval);
   }, [isActive, timeLeft]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPersisted = async () => {
+      try {
+        const data = await window.ipcRenderer?.invoke('storage:load') as { pomodoroDurations?: Durations } | null;
+        if (cancelled || !data?.pomodoroDurations) return;
+
+        setDurations(data.pomodoroDurations);
+        setTimeLeft(data.pomodoroDurations[mode] * 60);
+      } catch (error) {
+        console.error('Failed to load Pomodoro settings', error);
+      }
+    };
+
+    loadPersisted();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!isActive) {
