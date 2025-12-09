@@ -105,7 +105,8 @@
 }
 
 .tracker-view,
-.pomodoro-view {
+.pomodoro-view,
+.stats-view {
   display: flex;
   flex-direction: column;
   gap: 1rem;

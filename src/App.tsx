@@ -8,13 +8,14 @@ import { Pomodoro } from './components/Pomodoro';
 import { formatTime } from './utils';
 import './App.css';
 import { WeeklyStats } from './components/WeeklyStats';
+import { StatsDashboard } from './components/StatsDashboard';
 
 function App() {
   const { projects, addProject, deleteProject, addSession, adjustProjectTime, sessions } = useProjects();
   const { seconds, isActive, activeProjectId, startTimer, stopTimer } = useTimer();
   const pomodoro = usePomodoro();
   
-  const [activeTab, setActiveTab] = useState<'tracker' | 'pomodoro'>('tracker');
+  const [activeTab, setActiveTab] = useState<'tracker' | 'pomodoro' | 'stats'>('tracker');
   const [isMiniMode, setIsMiniMode] = useState(false);
 
   const handleStop = () => {
@@ -31,6 +32,10 @@ function App() {
 
   const toggleMiniMode = () => {
     const newState = !isMiniMode;
+    // When entering mini mode, keep the UI on tracker to avoid unsupported views in compact mode
+    if (newState && activeTab === 'stats') {
+      setActiveTab('tracker');
+    }
     setIsMiniMode(newState);
     window.ipcRenderer.toggleMiniMode(newState);
   };
@@ -139,6 +144,12 @@ function App() {
           >
             Pomodoro
           </button>
+          <button 
+            className={`tab-btn ${activeTab === 'stats' ? 'active' : ''}`}
+            onClick={() => setActiveTab('stats')}
+          >
+            Dashboard
+          </button>
         </div>
         <button className="mini-mode-btn" onClick={toggleMiniMode}>
           Mini Mode
@@ -146,7 +157,7 @@ function App() {
       </header>
       
       <main className="content">
-        {activeTab === 'tracker' ? (
+        {activeTab === 'tracker' && (
           <div className="tracker-view">
             {isActive && (
               <Timer 
@@ -169,9 +180,17 @@ function App() {
               onAdjust={adjustProjectTime}
             />
           </div>
-        ) : (
+        )}
+
+        {activeTab === 'pomodoro' && (
           <div className="pomodoro-view">
             <Pomodoro pomodoro={pomodoro} />
+          </div>
+        )}
+
+        {activeTab === 'stats' && (
+          <div className="stats-view">
+            <StatsDashboard projects={projects} sessions={sessions} />
           </div>
         )}
       </main>
