@@ -9,6 +9,7 @@ import { formatTime } from './utils';
 import './App.css';
 import { WeeklyStats } from './components/WeeklyStats';
 import { StatsDashboard } from './components/StatsDashboard';
+import { MiniTimeTimer } from './components/MiniTimeTimer';
 
 function App() {
   const { projects, addProject, deleteProject, addSession, adjustProjectTime, sessions } = useProjects();
@@ -96,6 +97,12 @@ function App() {
                 </>
             ) : (
                 <>
+                     <MiniTimeTimer
+                       timeLeftSeconds={pomodoro.timeLeft}
+                       durationMinutes={pomodoro.durations[pomodoro.mode]}
+                       isActive={pomodoro.isActive}
+                       onDurationMinutesChange={(minutes) => pomodoro.handleDurationChange(pomodoro.mode, String(minutes))}
+                     />
                      <div style={{ fontSize: '2.5rem', fontFamily: `'Space Grotesk', 'Inter', system-ui, sans-serif`, fontWeight: 'bold', letterSpacing: '2px' }}>
                         {formatTime(pomodoro.timeLeft)}
                     </div>
